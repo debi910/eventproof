@@ -9,11 +9,11 @@ evidence-aware event verification. It produces one of:
 * `CONFLICTING_EVIDENCE`
 * `UNVERIFIABLE`
 
-The current deterministic pipeline inspects supplied metadata, parses dates,
-locations, and coordinates, and aggregates perturbation scores. It does not
-pretend that an absent signal is proof. Open-Meteo and GDACS adapters are
-available for future opt-in orchestration; the API currently remains
-offline-first and does not make network calls by default.
+The current deterministic pipeline accepts short image/video/audio uploads or
+JSON evidence, inspects supplied metadata, parses dates, locations, and
+coordinates, and aggregates perturbation scores. It does not pretend that an
+absent signal is proof. Open-Meteo and GDACS adapters are opt-in; failures are
+shown as unavailable evidence rather than converted into a positive result.
 
 ## Run
 
@@ -26,6 +26,16 @@ uvicorn eventproof.main:app --reload
 
 Open http://127.0.0.1:8000. API docs are at `/docs`.
 
+The browser form uses `multipart/form-data`. API clients may also send JSON:
+
+```json
+{"evidence":{"text":"Flood in Quito 2025-02-03","claimed_location":"Quito"}}
+```
+
+For multipart requests, use the `media` field for an image/video/audio file
+and text fields such as `claimed_event`, `claimed_location`, and
+`check_external_sources`. Uploads are limited to 25 MB.
+
 ## Checks
 
 ```bash
@@ -37,5 +47,7 @@ pytest
 
 This is not a forensic authenticity system. It cannot verify media pixels,
 identify a person, establish chain of custody, or guarantee event truth.
-External sources may be stale or unavailable. Human review and independently
-verifiable provenance remain necessary.
+Temporal localization, heavyweight detector adapters, and C2PA inspection are
+extension points, not bundled capabilities. External sources may be stale or
+unavailable. Human review and independently verifiable provenance remain
+necessary.

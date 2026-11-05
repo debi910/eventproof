@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Any
 
@@ -58,6 +59,40 @@ def inspect_metadata(evidence: EvidenceInput) -> dict[str, Any]:
         "has_timestamp": bool(metadata.get("timestamp") or evidence.observed_at),
         "has_hash": bool(metadata.get("sha256") or metadata.get("hash")),
     }
+
+
+def inspect_media(filename: str | None, content_type: str | None, data: bytes) -> dict[str, Any]:
+    if not filename:
+        return {
+            "provided": False,
+            "status": "not_provided",
+            "sha256": None,
+            "size_bytes": 0,
+            "content_type": None,
+        }
+    return {
+        "provided": True,
+        "status": "received",
+        "filename": filename,
+        "content_type": content_type,
+        "size_bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "analysis_status": "metadata_only",
+        "note": "Pixel, waveform, and temporal model analysis are not enabled in this MVP.",
+    }
+
+
+def validate_media(filename: str | None, content_type: str | None, data: bytes) -> str | None:
+    if not filename:
+        return None
+    allowed_prefixes = ("image/", "video/", "audio/")
+    if not content_type or not content_type.startswith(allowed_prefixes):
+        return "Only image, video, and audio uploads are accepted."
+    if not data:
+        return "The uploaded media file is empty."
+    if len(data) > 25 * 1024 * 1024:
+        return "Media uploads must be 25 MB or smaller."
+    return None
 
 
 def classify_evidence(

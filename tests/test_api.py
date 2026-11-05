@@ -18,3 +18,24 @@ def test_verify_endpoint():
 def test_validation_rejects_bad_scores():
     response = client.post("/api/v1/verify", json={"evidence": {"perturbation_scores": {"x": 2}}})
     assert response.status_code == 422
+
+
+def test_multipart_media_report():
+    response = client.post(
+        "/api/v1/verify",
+        data={"text": "Synthetic demo image", "claimed_event": "Demo"},
+        files={"media": ("demo.jpg", b"fake-image-bytes", "image/jpeg")},
+    )
+    assert response.status_code == 200
+    report = response.json()["report"]
+    assert report["media_inspection"]["provided"] is True
+    assert report["media_inspection"]["analysis_status"] == "metadata_only"
+
+
+def test_invalid_media_type_rejected():
+    response = client.post(
+        "/api/v1/verify",
+        data={"text": "not media"},
+        files={"media": ("notes.txt", b"hello", "text/plain")},
+    )
+    assert response.status_code == 422

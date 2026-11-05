@@ -47,6 +47,8 @@ class Report(BaseModel):
     metadata_inspection: dict[str, Any]
     perturbation_profile: dict[str, Any]
     provenance: dict[str, Any]
+    media_inspection: dict[str, Any]
+    external_evidence: dict[str, Any]
     limitations: list[str]
 
 

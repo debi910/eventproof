@@ -2,11 +2,16 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EventProof</title><link rel="stylesheet" href="/static/style.css"></head>
 <body><main><h1>EventProof</h1><p class="lede">Evidence-aware event verification. Results are cautious by design.</p>
-<form id="form"><label>Evidence text<textarea id="text" rows="8" placeholder="Paste a claim, caption, or transcript"></textarea></label>
+<form id="form" enctype="multipart/form-data"><label>Media (optional)<input id="media" type="file" accept="image/*,video/*,audio/*"></label>
+<label>Evidence text<textarea id="text" rows="8" placeholder="Paste a claim, caption, or transcript"></textarea></label>
 <label>Claimed event<input id="event" placeholder="e.g. Flood in City on 2025-01-02"></label><label>Location<input id="location"></label>
-<label>Source URL<input id="url" type="url"></label><button>Analyze evidence</button></form><pre id="result" aria-live="polite"></pre></main>
+<label>Source URL<input id="url" type="url"></label><label><input id="external" type="checkbox"> Check live Open-Meteo/GDACS sources</label>
+<button>Analyze evidence</button></form><pre id="result" aria-live="polite"></pre></main>
 <script>
 document.querySelector("#form").addEventListener("submit", async (event) => { event.preventDefault(); const result=document.querySelector("#result"); result.textContent="Analyzing…";
-const body={evidence:{text:document.querySelector("#text").value,claimed_event:document.querySelector("#event").value||null,claimed_location:document.querySelector("#location").value||null,source_url:document.querySelector("#url").value||null}};
-const response=await fetch("/api/v1/verify",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}); result.textContent=JSON.stringify(await response.json(),null,2);});
+const body=new FormData(); body.append("text",document.querySelector("#text").value); body.append("claimed_event",document.querySelector("#event").value);
+body.append("claimed_location",document.querySelector("#location").value); body.append("source_url",document.querySelector("#url").value);
+body.append("check_external_sources",document.querySelector("#external").checked); const media=document.querySelector("#media").files[0]; if(media) body.append("media",media);
+try { const response=await fetch("/api/v1/verify",{method:"POST",body}); result.textContent=JSON.stringify(await response.json(),null,2); }
+catch(error) { result.textContent=JSON.stringify({error:error.message},null,2); }});
 </script></body></html>
