@@ -34,6 +34,11 @@ clear user action after the model responds. It also makes the demo honest:
 the synthetic fixture is marked as synthetic and no detector result is
 presented as proof.
 
+The demo intentionally uses a **metadata-only synthetic fixture**. It does not
+pretend that an image was uploaded or that pixels were analyzed. Real uploads
+are signature-validated, hashed, and reported as metadata-only until a
+detector adapter is explicitly enabled.
+
 ## Run
 
 ```bash

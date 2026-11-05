@@ -67,7 +67,7 @@ async def verify(request: Request) -> VerifyResponse:
         event_grounding=parse_event_grounding(evidence),
         metadata_inspection=inspect_metadata(evidence),
         perturbation_profile=aggregate_perturbation_profile(evidence.perturbation_scores),
-        provenance=provenance(evidence),
+        provenance=provenance(evidence, external_evidence),
         media_inspection=inspect_media(*media),
         external_evidence=external_evidence,
         evidence_ledger=build_evidence_ledger(
@@ -183,7 +183,7 @@ async def parse_request(
         is_upload = isinstance(upload, (UploadFile, StarletteUploadFile))
         filename = upload.filename if is_upload else None
         upload_type = upload.content_type if is_upload else None
-        data = await upload.read() if is_upload else b""
+        data = await read_limited_upload(upload) if is_upload else b""
         error = validate_media(filename, upload_type, data)
         if error:
             raise HTTPException(status_code=422, detail=error)
@@ -232,6 +232,7 @@ async def collect_external_evidence(evidence: EvidenceInput) -> dict[str, Any]:
     available = any(source.get("available") is True for source in sources)
     return {
         "requested": True,
+        "performed": True,
         "status": "available" if available else "unavailable",
         "sources": sources,
         "note": (
@@ -239,3 +240,18 @@ async def collect_external_evidence(evidence: EvidenceInput) -> dict[str, Any]:
             "relying on it."
         ),
     }
+
+
+async def read_limited_upload(upload: UploadFile | StarletteUploadFile) -> bytes:
+    maximum = 25 * 1024 * 1024
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await upload.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > maximum:
+            raise HTTPException(status_code=422, detail="Media uploads must be 25 MB or smaller.")
+        chunks.append(chunk)
+    return b"".join(chunks)

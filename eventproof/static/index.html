@@ -45,8 +45,8 @@
           <path class="scan-line faint" d="M210 210 L82 290"/>
           <path class="crosshair" d="M210 42v34M210 344v34M42 210h34M344 210h34"/>
           <circle class="core-dot" cx="210" cy="210" r="8"/>
-          <text x="210" y="199" text-anchor="middle" class="svg-kicker">LIVE SIGNAL</text>
-          <text x="210" y="224" text-anchor="middle" class="svg-value">EVIDENCE</text>
+          <text x="210" y="199" text-anchor="middle" class="svg-kicker">DECORATIVE</text>
+          <text x="210" y="224" text-anchor="middle" class="svg-value">SIGNAL MAP</text>
         </svg>
       </div>
     </section>
@@ -58,9 +58,9 @@
           <span class="panel-index">A</span>
         </div>
         <form id="form" enctype="multipart/form-data">
-          <div class="demo-strip"><span><b>FAST TRACK</b> See the full evidence pass with a labeled synthetic case.</span><button type="button" id="demo-button">Load demo case ↗</button></div>
+          <div class="demo-strip"><span><b>FAST TRACK</b> Load a labeled metadata-only synthetic case. No media is analyzed.</span><button type="button" id="demo-button">Load demo case ↗</button></div>
           <label class="dropzone" id="dropzone" for="media">
-            <input id="media" type="file" accept="image/*,video/*,audio/*">
+            <input id="media" class="visually-hidden" type="file" accept="image/*,video/*,audio/*">
             <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></span>
             <span class="drop-title">Drop image, video, or audio</span>
             <span class="drop-subtitle">or <u>browse your files</u> · max 25 MB</span>
@@ -75,7 +75,7 @@
             <label class="field"><span>Source URL <small>OPTIONAL</small></span><input id="url" type="url" placeholder="https://…"></label>
           </div>
           <div class="form-footer">
-            <label class="toggle"><input id="external" type="checkbox"><span class="toggle-ui"></span><span>Ground against live sources <small>OPEN-METEO + GDACS</small></span></label>
+            <label class="toggle"><input id="external" class="visually-hidden" type="checkbox"><span class="toggle-ui"></span><span>Check source availability <small>OPEN-METEO + GDACS</small></span></label>
             <button type="submit" class="primary-button"><span>Run evidence pass</span><svg viewBox="0 0 24 24"><path d="M5 12h13m-5-5 5 5-5 5"/></svg></button>
           </div>
         </form>
@@ -92,14 +92,14 @@
       </aside>
     </section>
 
-    <section class="result-section hidden" id="result-section">
+    <section class="result-section hidden" id="result-section" aria-live="polite" aria-atomic="true" tabindex="-1">
       <div class="result-header">
         <div><p class="eyebrow">02 / EVIDENCE PASS</p><h2 id="result-title">Report ready.</h2></div>
         <div class="result-actions"><button class="text-button" id="copy-report" type="button">Copy report <span>⌘</span></button><button class="text-button" id="reset" type="button">Start another pass <span>↗</span></button></div>
       </div>
       <div class="report-hero">
         <div class="verdict-block"><span class="verdict-kicker">CURRENT READ</span><div id="category" class="verdict">UNVERIFIABLE</div><p id="confidence" class="confidence">No confidence score claimed</p></div>
-        <div class="verdict-meter"><div class="meter-ring" id="meter-ring"><span id="meter-value">—</span></div><div><span class="meter-label">EVIDENCE<br>STRENGTH</span><span class="meter-caption" id="meter-caption">Awaiting signal</span></div></div>
+        <div class="verdict-meter"><div class="meter-ring" id="meter-ring"><span id="meter-value">—</span></div><div><span class="meter-label">PERTURBATION<br>SIGNAL</span><span class="meter-caption" id="meter-caption">Awaiting signal</span></div></div>
       </div>
       <div id="rationale" class="rationale"></div>
       <div class="report-grid">
@@ -122,9 +122,12 @@
     const fileName = document.querySelector("#file-name");
     const submitButton = form.querySelector('button[type="submit"]');
     let latestReport = null;
-    const categoryLabels = { SUPPORTED: "Supported", MANIPULATED: "Manipulated", RECYCLED_OR_MISCONTEXTUALIZED: "Recycled / miscontextualized", CONFLICTING_EVIDENCE: "Conflicting evidence", UNVERIFIABLE: "Unverifiable" };
+    const categoryLabels = { SUPPORTED: "Supported by verified source", MANIPULATED: "Manipulated", RECYCLED_OR_MISCONTEXTUALIZED: "Recycled / miscontextualized", CONFLICTING_EVIDENCE: "Conflicting evidence", UNVERIFIABLE: "Unverifiable" };
 
     media.addEventListener("change", () => { fileName.textContent = media.files[0] ? media.files[0].name : ""; dropzone.classList.toggle("has-file", Boolean(media.files[0])); });
+    form.addEventListener("input", event => {
+      if (event.target.id !== "external") { window.demoMetadata = {}; window.demoPerturbation = {}; }
+    });
     ["dragenter", "dragover"].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.add("is-dragging"); }));
     ["dragleave", "drop"].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.remove("is-dragging"); }));
     dropzone.addEventListener("drop", event => { if (event.dataTransfer.files[0]) { media.files = event.dataTransfer.files; media.dispatchEvent(new Event("change")); } });
@@ -162,22 +165,31 @@
 
     document.querySelector("#copy-report").addEventListener("click", async event => {
       if (!latestReport) return;
-      await navigator.clipboard.writeText(JSON.stringify(latestReport, null, 2));
-      event.currentTarget.innerHTML = "Copied <span>✓</span>";
-      setTimeout(() => { event.currentTarget.innerHTML = "Copy report <span>⌘</span>"; }, 1800);
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(latestReport, null, 2));
+        event.currentTarget.innerHTML = "Copied <span>✓</span>";
+        setTimeout(() => { event.currentTarget.innerHTML = "Copy report <span>⌘</span>"; }, 1800);
+      } catch {
+        event.currentTarget.innerHTML = "Copy unavailable <span>!</span>";
+        setTimeout(() => { event.currentTarget.innerHTML = "Copy report <span>⌘</span>"; }, 1800);
+      }
     });
 
-    document.querySelector("#reset").addEventListener("click", () => { resultSection.classList.add("hidden"); form.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    document.querySelector("#reset").addEventListener("click", () => {
+      form.reset(); window.demoMetadata = {}; window.demoPerturbation = {};
+      fileName.textContent = ""; dropzone.classList.remove("has-file"); clearReport();
+      resultSection.classList.add("hidden"); form.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
 
     function renderReport(report) {
       latestReport = report;
       resultSection.classList.remove("hidden");
       document.querySelector("#category").textContent = categoryLabels[report.category] || report.category;
-      document.querySelector("#confidence").textContent = report.confidence === null ? "No confidence score claimed" : `${Math.round(report.confidence * 100)}% calibrated signal`;
+      document.querySelector("#confidence").textContent = report.confidence === null ? "No calibrated probability claimed" : `${Math.round(report.confidence * 100)}% uncalibrated perturbation signal`;
       const score = report.perturbation_profile.score;
       const meter = score === null ? null : Math.round(score * 100);
       document.querySelector("#meter-value").textContent = meter === null ? "—" : `${meter}%`;
-      document.querySelector("#meter-caption").textContent = meter === null ? "No perturbation profile" : report.perturbation_profile.interpretation;
+      document.querySelector("#meter-caption").textContent = meter === null ? "No perturbation profile" : "Uncalibrated perturbation signal";
       document.querySelector("#meter-ring").style.setProperty("--meter", `${meter || 0}%`);
       document.querySelector("#rationale").innerHTML = (report.rationale || []).map(item => `<span><i>+</i>${escapeHtml(item)}</span>`).join("");
       document.querySelector("#grounding").innerHTML = definitionList({ "Event": report.event_grounding.event || "Not extracted", "Locations": listValue(report.event_grounding.locations), "Dates": listValue(report.event_grounding.dates), "Coordinates": listValue(report.event_grounding.coordinates) });
@@ -188,10 +200,22 @@
       document.querySelector("#limitations").textContent = (report.limitations || []).join(" ");
       document.querySelector("#review-priority").textContent = report.review_recommendation.decision.replaceAll("_", " ");
       document.querySelector("#next-checks").innerHTML = report.review_recommendation.next_checks.map((item, index) => `<span><b>0${index + 1}</b>${escapeHtml(item)}</span>`).join("");
-      resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      resultSection.focus({ preventScroll: true }); resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    function renderError(message) { resultSection.classList.remove("hidden"); document.querySelector("#category").textContent = "Pass interrupted"; document.querySelector("#confidence").textContent = message; document.querySelector("#rationale").innerHTML = "<span><i>!</i>Check the file type, request fields, and server status, then try again.</span>"; resultSection.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    function renderError(message) {
+      clearReport(); resultSection.classList.remove("hidden");
+      document.querySelector("#category").textContent = "Pass interrupted";
+      document.querySelector("#confidence").textContent = message;
+      document.querySelector("#rationale").innerHTML = "<span><i>!</i>Check the file type, request fields, and server status, then try again.</span>";
+      resultSection.focus({ preventScroll: true }); resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function clearReport() {
+      latestReport = null;
+      ["#grounding", "#perturbation", "#provenance", "#external-report", "#ledger-rows", "#next-checks", "#limitations", "#rationale"].forEach(selector => { document.querySelector(selector).innerHTML = ""; });
+      document.querySelector("#category").textContent = "UNVERIFIABLE"; document.querySelector("#confidence").textContent = "No calibrated probability claimed";
+      document.querySelector("#meter-value").textContent = "—"; document.querySelector("#meter-caption").textContent = "Awaiting signal";
+    }
     function definitionList(data) { return Object.entries(data).map(([key, value]) => `<div class="definition"><span>${escapeHtml(key)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join(""); }
     function listValue(value) { return Array.isArray(value) && value.length ? value.join(" · ") : "Not extracted"; }
     function formatBytes(bytes) { if (!bytes) return "0 B"; if (bytes < 1024) return `${bytes} B`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }

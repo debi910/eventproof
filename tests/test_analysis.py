@@ -12,14 +12,14 @@ def test_categories_do_not_fabricate_confidence():
     assert confidence is None
 
 
-def test_recycled_and_conflicting_categories():
+def test_submitter_assertions_do_not_create_verdicts():
     recycled = EvidenceInput(text="old footage", metadata={"recycled": True})
     conflicting = EvidenceInput(text="claim", metadata={"conflicting_evidence": True})
-    assert classify_evidence(recycled)[0] is EvidenceCategory.RECYCLED_OR_MISCONTEXTUALIZED
-    assert classify_evidence(conflicting)[0] is EvidenceCategory.CONFLICTING_EVIDENCE
+    assert classify_evidence(recycled)[0] is EvidenceCategory.UNVERIFIABLE
+    assert classify_evidence(conflicting)[0] is EvidenceCategory.UNVERIFIABLE
     assert (
         classify_evidence(EvidenceInput(text="corroborated", metadata={"supported": True}))[0]
-        is EvidenceCategory.SUPPORTED
+        is EvidenceCategory.UNVERIFIABLE
     )
 
 
@@ -35,3 +35,10 @@ def test_event_grounding():
     )
     assert "2025-02-03" in grounding["dates"]
     assert grounding["coordinates"] == ["0.1, -78.4"]
+
+
+def test_untrusted_media_signature_is_rejected():
+    from eventproof.analysis import validate_media
+
+    assert validate_media("demo.jpg", "image/jpeg", b"not-an-image") is not None
+    assert validate_media("demo.jpg", "image/png", b"\xff\xd8\xff\x00demo") is not None
