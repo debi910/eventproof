@@ -40,6 +40,8 @@ class VerifyRequest(BaseModel):
 
 
 class Report(BaseModel):
+    report_id: str
+    generated_at: str
     category: EvidenceCategory
     confidence: float | None = None
     rationale: list[str]
@@ -49,6 +51,8 @@ class Report(BaseModel):
     provenance: dict[str, Any]
     media_inspection: dict[str, Any]
     external_evidence: dict[str, Any]
+    evidence_ledger: list[dict[str, Any]]
+    review_recommendation: dict[str, Any]
     limitations: list[str]
 
 

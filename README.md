@@ -15,6 +15,25 @@ coordinates, and aggregates perturbation scores. It does not pretend that an
 absent signal is proof. Open-Meteo and GDACS adapters are opt-in; failures are
 shown as unavailable evidence rather than converted into a positive result.
 
+## The demo story
+
+EventProof is intentionally positioned as an **evidence ledger for one
+high-stakes decision**, not a universal real/fake classifier. The fastest
+demo is:
+
+1. Click **Load demo case** in the browser.
+2. Run the evidence pass on the labeled synthetic Quito flood claim.
+3. Walk through the verdict, perturbation signal, provenance gaps, and the
+   explicit support / contradiction / unknown ledger.
+4. End on the reviewer plan: what a journalist, moderator, or incident
+   responder should check next.
+
+This shape follows the strongest recent hackathon patterns: a narrow workflow,
+visible uncertainty, source-by-source reasoning, graceful degradation, and a
+clear user action after the model responds. It also makes the demo honest:
+the synthetic fixture is marked as synthetic and no detector result is
+presented as proof.
+
 ## Run
 
 ```bash

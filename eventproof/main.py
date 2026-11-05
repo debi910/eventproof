@@ -1,4 +1,6 @@
 import json
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +48,6 @@ async def verify(request: Request) -> VerifyResponse:
     external_conflict = False
     if check_external_sources:
         external_evidence = await collect_external_evidence(evidence)
-        external_support = external_evidence["status"] == "available"
     category, confidence, rationale = classify_evidence(
         evidence,
         external_conflict=external_conflict,
@@ -58,6 +59,8 @@ async def verify(request: Request) -> VerifyResponse:
         "Heavyweight deepfake, temporal localization, and C2PA model adapters are not bundled.",
     ]
     report = Report(
+        report_id=f"EP-{uuid.uuid4().hex[:10].upper()}",
+        generated_at=datetime.now(timezone.utc).isoformat(),
         category=category,
         confidence=confidence,
         rationale=rationale,
@@ -67,9 +70,101 @@ async def verify(request: Request) -> VerifyResponse:
         provenance=provenance(evidence),
         media_inspection=inspect_media(*media),
         external_evidence=external_evidence,
+        evidence_ledger=build_evidence_ledger(
+            evidence, category.value, external_evidence
+        ),
+        review_recommendation=build_review_recommendation(
+            evidence, category.value, external_evidence
+        ),
         limitations=limitations,
     )
     return VerifyResponse(report=report)
+
+
+def build_evidence_ledger(
+    evidence: EvidenceInput, category: str, external_evidence: dict[str, Any]
+) -> list[dict[str, Any]]:
+    ledger = [
+        {
+            "status": "unknown",
+            "signal": "Media model analysis",
+            "finding": "Heavyweight pixel, waveform, and temporal detectors are not bundled.",
+        },
+        {
+            "status": "unknown" if not evidence.metadata else "observed",
+            "signal": "Metadata / provenance",
+            "finding": (
+                "No metadata supplied."
+                if not evidence.metadata
+                else f"Inspected keys: {', '.join(sorted(evidence.metadata))}."
+            ),
+        },
+        {
+            "status": (
+                "observed"
+                if evidence.claimed_event or evidence.claimed_location
+                else "unknown"
+            ),
+            "signal": "Claim grounding",
+            "finding": (
+                "Event or location fields were supplied."
+                if evidence.claimed_event or evidence.claimed_location
+                else "No structured event or location claim was supplied."
+            ),
+        },
+    ]
+    if evidence.perturbation_scores:
+        score = sum(evidence.perturbation_scores.values()) / len(evidence.perturbation_scores)
+        ledger.append(
+            {
+                "status": "contradicts" if score >= 0.8 else "observed",
+                "signal": "Perturbation profile",
+                "finding": f"Mean score {score:.0%}; this is a manipulation signal, not proof.",
+            }
+        )
+    ledger.append(
+        {
+            "status": "unknown"
+            if not external_evidence["requested"]
+            else ("observed" if external_evidence["status"] == "available" else "unknown"),
+            "signal": "External grounding",
+            "finding": (
+                "Not requested."
+                if not external_evidence["requested"]
+                else (
+                    "At least one source responded; response availability is not claim support."
+                    if external_evidence["status"] == "available"
+                    else "Requested sources were unavailable."
+                )
+            ),
+        }
+    )
+    if category == "CONFLICTING_EVIDENCE":
+        ledger.append(
+            {
+                "status": "contradicts",
+                "signal": "Aggregation",
+                "finding": "Conflicting evidence takes precedence over a simple positive signal.",
+            }
+        )
+    return ledger
+
+
+def build_review_recommendation(
+    evidence: EvidenceInput, category: str, external_evidence: dict[str, Any]
+) -> dict[str, Any]:
+    next_checks = ["Have a human reviewer inspect the original file and source context."]
+    if not evidence.metadata:
+        next_checks.append("Request original metadata or a chain-of-custody record.")
+    if not evidence.perturbation_scores:
+        next_checks.append("Run an enabled media detector before making a high-stakes decision.")
+    if external_evidence["requested"] and external_evidence["status"] == "unavailable":
+        next_checks.append("Retry external grounding when the source APIs are reachable.")
+    return {
+        "priority": "high" if category != "SUPPORTED" else "medium",
+        "decision": "human_review_required",
+        "next_checks": next_checks,
+    }
 
 
 async def parse_request(

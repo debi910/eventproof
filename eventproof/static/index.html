@@ -58,6 +58,7 @@
           <span class="panel-index">A</span>
         </div>
         <form id="form" enctype="multipart/form-data">
+          <div class="demo-strip"><span><b>FAST TRACK</b> See the full evidence pass with a labeled synthetic case.</span><button type="button" id="demo-button">Load demo case ↗</button></div>
           <label class="dropzone" id="dropzone" for="media">
             <input id="media" type="file" accept="image/*,video/*,audio/*">
             <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></span>
@@ -94,7 +95,7 @@
     <section class="result-section hidden" id="result-section">
       <div class="result-header">
         <div><p class="eyebrow">02 / EVIDENCE PASS</p><h2 id="result-title">Report ready.</h2></div>
-        <button class="text-button" id="reset" type="button">Start another pass <span>↗</span></button>
+        <div class="result-actions"><button class="text-button" id="copy-report" type="button">Copy report <span>⌘</span></button><button class="text-button" id="reset" type="button">Start another pass <span>↗</span></button></div>
       </div>
       <div class="report-hero">
         <div class="verdict-block"><span class="verdict-kicker">CURRENT READ</span><div id="category" class="verdict">UNVERIFIABLE</div><p id="confidence" class="confidence">No confidence score claimed</p></div>
@@ -107,7 +108,9 @@
         <article class="report-card"><div class="card-title"><span>PROVENANCE / MEDIA</span><b>03</b></div><div id="provenance" class="card-content"></div></article>
         <article class="report-card"><div class="card-title"><span>EXTERNAL EVIDENCE</span><b>04</b></div><div id="external-report" class="card-content"></div></article>
       </div>
+      <div class="ledger"><div class="card-title"><span>EVIDENCE LEDGER / WHAT THE SYSTEM CAN DEFEND</span><b>05</b></div><div id="ledger-rows"></div></div>
       <div class="limitations"><span class="eyebrow">REVIEWER NOTE</span><p id="limitations"></p></div>
+      <div class="review-plan"><div><span class="eyebrow">RECOMMENDED NEXT MOVE</span><h3 id="review-priority">Human review required</h3></div><div id="next-checks"></div></div>
     </section>
   </main>
   <footer class="site-footer shell"><span>EVENTPROOF / EVIDENCE DESK</span><span>AN HONEST MVP FOR A MESSY WORLD</span></footer>
@@ -117,7 +120,8 @@
     const dropzone = document.querySelector("#dropzone");
     const media = document.querySelector("#media");
     const fileName = document.querySelector("#file-name");
-    const submitButton = form.querySelector("button");
+    const submitButton = form.querySelector('button[type="submit"]');
+    let latestReport = null;
     const categoryLabels = { SUPPORTED: "Supported", MANIPULATED: "Manipulated", RECYCLED_OR_MISCONTEXTUALIZED: "Recycled / miscontextualized", CONFLICTING_EVIDENCE: "Conflicting evidence", UNVERIFIABLE: "Unverifiable" };
 
     media.addEventListener("change", () => { fileName.textContent = media.files[0] ? media.files[0].name : ""; dropzone.classList.toggle("has-file", Boolean(media.files[0])); });
@@ -134,6 +138,8 @@
       body.append("claimed_location", document.querySelector("#location").value);
       body.append("source_url", document.querySelector("#url").value);
       body.append("check_external_sources", document.querySelector("#external").checked);
+      body.append("metadata", JSON.stringify(window.demoMetadata || {}));
+      body.append("perturbation_scores", JSON.stringify(window.demoPerturbation || {}));
       if (media.files[0]) body.append("media", media.files[0]);
       try {
         const response = await fetch("/api/v1/verify", { method: "POST", body });
@@ -144,9 +150,27 @@
       finally { submitButton.classList.remove("is-loading"); submitButton.querySelector("span").textContent = "Run evidence pass"; }
     });
 
+    document.querySelector("#demo-button").addEventListener("click", () => {
+      document.querySelector("#text").value = "A synthetic demo image claims a flash flood hit Quito on 2025-02-03. This fixture is intentionally labeled and exists to demonstrate the evidence workflow.";
+      document.querySelector("#event").value = "Flash flood in Quito";
+      document.querySelector("#location").value = "Quito, Ecuador";
+      window.demoMetadata = { synthetic: true, software: "EventProof demo fixture", timestamp: "2025-02-03T12:00:00Z" };
+      window.demoPerturbation = { jpeg: 0.84, crop: 0.82, resize: 0.86 };
+      document.querySelector("#external").checked = false;
+      document.querySelector("#text").focus();
+    });
+
+    document.querySelector("#copy-report").addEventListener("click", async event => {
+      if (!latestReport) return;
+      await navigator.clipboard.writeText(JSON.stringify(latestReport, null, 2));
+      event.currentTarget.innerHTML = "Copied <span>✓</span>";
+      setTimeout(() => { event.currentTarget.innerHTML = "Copy report <span>⌘</span>"; }, 1800);
+    });
+
     document.querySelector("#reset").addEventListener("click", () => { resultSection.classList.add("hidden"); form.scrollIntoView({ behavior: "smooth", block: "start" }); });
 
     function renderReport(report) {
+      latestReport = report;
       resultSection.classList.remove("hidden");
       document.querySelector("#category").textContent = categoryLabels[report.category] || report.category;
       document.querySelector("#confidence").textContent = report.confidence === null ? "No confidence score claimed" : `${Math.round(report.confidence * 100)}% calibrated signal`;
@@ -160,7 +184,10 @@
       document.querySelector("#perturbation").innerHTML = definitionList({ "Status": report.perturbation_profile.available ? "Profile available" : "Not provided", "Mean score": score === null ? "—" : `${Math.round(score * 100)}%`, "Signals": listValue(report.perturbation_profile.signals), "Samples": report.perturbation_profile.sample_count || "—" });
       document.querySelector("#provenance").innerHTML = definitionList({ "Media": report.media_inspection.provided ? `${report.media_inspection.content_type || "file"} · ${formatBytes(report.media_inspection.size_bytes)}` : "Not provided", "Hash": report.media_inspection.sha256 ? report.media_inspection.sha256.slice(0, 16) + "…" : "—", "Metadata": report.metadata_inspection.provided ? `${report.metadata_inspection.keys.length} keys inspected` : "Not provided", "Source": report.provenance.source_url || "No URL supplied" });
       document.querySelector("#external-report").innerHTML = definitionList({ "Status": report.external_evidence.status.replaceAll("_", " "), "Sources": report.external_evidence.sources.length ? report.external_evidence.sources.map(source => source.provider).join(" · ") : "None requested", "Grounding": report.external_evidence.note || "Offline pass", "Review": "Human verification required" });
+      document.querySelector("#ledger-rows").innerHTML = report.evidence_ledger.map(row => `<div class="ledger-row"><span class="ledger-status ${row.status}">${row.status}</span><strong>${escapeHtml(row.signal)}</strong><p>${escapeHtml(row.finding)}</p></div>`).join("");
       document.querySelector("#limitations").textContent = (report.limitations || []).join(" ");
+      document.querySelector("#review-priority").textContent = report.review_recommendation.decision.replaceAll("_", " ");
+      document.querySelector("#next-checks").innerHTML = report.review_recommendation.next_checks.map((item, index) => `<span><b>0${index + 1}</b>${escapeHtml(item)}</span>`).join("");
       resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
