@@ -1,0 +1,5 @@
+:root { font-family: system-ui, sans-serif; color: #172033; background: #f5f7fb; }
+body { margin: 0; } main { max-width: 760px; margin: 4rem auto; padding: 2rem; background: white; border-radius: 14px; box-shadow: 0 8px 30px #17203318; }
+h1 { margin-bottom: .25rem; } .lede { color: #586174; } label { display: block; margin: 1rem 0; font-weight: 600; }
+input, textarea { box-sizing: border-box; display: block; width: 100%; margin-top: .4rem; padding: .7rem; border: 1px solid #cbd3e1; border-radius: 7px; font: inherit; }
+button { padding: .75rem 1rem; border: 0; border-radius: 7px; color: white; background: #3156d3; font-weight: 700; cursor: pointer; } pre { white-space: pre-wrap; margin-top: 2rem; background: #f0f3f8; padding: 1rem; border-radius: 7px; }

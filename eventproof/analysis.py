@@ -1,0 +1,142 @@
+"""Deterministic evidence analysis. It deliberately refuses to invent certainty."""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from .models import EvidenceCategory, EvidenceInput
+
+
+def parse_event_grounding(evidence: EvidenceInput) -> dict[str, Any]:
+    text = evidence.text
+    dates = re.findall(r"\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]20\d{2})\b", text)
+    coordinates = re.findall(r"[-+]?\d{1,3}\.\d+\s*,\s*[-+]?\d{1,3}\.\d+", text)
+    locations = [x for x in (evidence.claimed_location,) if x]
+    event = evidence.claimed_event or next(
+        (line.strip() for line in text.splitlines() if line.strip()), None
+    )
+    return {
+        "event": event,
+        "locations": locations,
+        "dates": dates,
+        "coordinates": coordinates,
+        "has_claim": bool(event or locations or dates or coordinates),
+    }
+
+
+def aggregate_perturbation_profile(scores: dict[str, float]) -> dict[str, Any]:
+    if not scores:
+        return {"available": False, "score": None, "signals": [], "interpretation": "not provided"}
+    score = sum(scores.values()) / len(scores)
+    signals = [name for name, value in scores.items() if value >= 0.6]
+    interpretation = (
+        "strong manipulation signal"
+        if score >= 0.7
+        else "some manipulation signal"
+        if score >= 0.4
+        else "weak manipulation signal"
+    )
+    return {
+        "available": True,
+        "score": round(score, 4),
+        "signals": signals,
+        "interpretation": interpretation,
+        "sample_count": len(scores),
+    }
+
+
+def inspect_metadata(evidence: EvidenceInput) -> dict[str, Any]:
+    metadata = evidence.metadata
+    suspicious = [
+        key for key in ("software", "editing_software", "history", "synthetic") if key in metadata
+    ]
+    return {
+        "provided": bool(metadata),
+        "keys": sorted(metadata),
+        "suspicious_keys": suspicious,
+        "has_timestamp": bool(metadata.get("timestamp") or evidence.observed_at),
+        "has_hash": bool(metadata.get("sha256") or metadata.get("hash")),
+    }
+
+
+def classify_evidence(
+    evidence: EvidenceInput,
+    *,
+    external_conflict: bool = False,
+    external_support: bool = False,
+) -> tuple[EvidenceCategory, float | None, list[str]]:
+    profile = aggregate_perturbation_profile(evidence.perturbation_scores)
+    metadata = inspect_metadata(evidence)
+    reasons: list[str] = []
+    if evidence.metadata.get("conflicting_evidence") is True:
+        return (
+            EvidenceCategory.CONFLICTING_EVIDENCE,
+            None,
+            ["Supplied provenance records conflicting evidence."],
+        )
+    if (
+        evidence.metadata.get("recycled") is True
+        or evidence.metadata.get("miscontextualized") is True
+    ):
+        return (
+            EvidenceCategory.RECYCLED_OR_MISCONTEXTUALIZED,
+            None,
+            ["Supplied provenance marks the evidence as recycled or out of context."],
+        )
+    if evidence.metadata.get("supported") is True:
+        return (
+            EvidenceCategory.SUPPORTED,
+            None,
+            ["Supplied provenance marks the evidence as corroborated."],
+        )
+    if external_conflict:
+        return (
+            EvidenceCategory.CONFLICTING_EVIDENCE,
+            None,
+            ["An external source conflicts with the claim."],
+        )
+    if profile["available"] and profile["score"] >= 0.8:
+        return (
+            EvidenceCategory.MANIPULATED,
+            profile["score"],
+            ["Perturbation profile is strongly anomalous."],
+        )
+    if metadata["suspicious_keys"] and profile["available"] and profile["score"] >= 0.6:
+        return (
+            EvidenceCategory.MANIPULATED,
+            profile["score"],
+            ["Metadata and perturbation signals are consistent with editing."],
+        )
+    if external_support and evidence.source_url:
+        return (
+            EvidenceCategory.SUPPORTED,
+            None,
+            ["A supplied external source supports the claim; confidence is not fabricated."],
+        )
+    if not evidence.text and not evidence.source_url:
+        return (
+            EvidenceCategory.UNVERIFIABLE,
+            None,
+            ["No evidence content or source URL was supplied."],
+        )
+    if evidence.source_url and evidence.claimed_event:
+        return (
+            EvidenceCategory.UNVERIFIABLE,
+            None,
+            ["A source and claim were supplied, but no live verification was requested."],
+        )
+    return (
+        EvidenceCategory.UNVERIFIABLE,
+        None,
+        reasons or ["Available inputs are insufficient to establish authenticity."],
+    )
+
+
+def provenance(evidence: EvidenceInput) -> dict[str, Any]:
+    return {
+        "source_url": str(evidence.source_url) if evidence.source_url else None,
+        "observed_at": evidence.observed_at,
+        "input_type": "text" if evidence.text else "metadata-only",
+        "external_check_performed": False,
+    }
