@@ -1,17 +1,174 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EventProof</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><main><h1>EventProof</h1><p class="lede">Evidence-aware event verification. Results are cautious by design.</p>
-<form id="form" enctype="multipart/form-data"><label>Media (optional)<input id="media" type="file" accept="image/*,video/*,audio/*"></label>
-<label>Evidence text<textarea id="text" rows="8" placeholder="Paste a claim, caption, or transcript"></textarea></label>
-<label>Claimed event<input id="event" placeholder="e.g. Flood in City on 2025-01-02"></label><label>Location<input id="location"></label>
-<label>Source URL<input id="url" type="url"></label><label><input id="external" type="checkbox"> Check live Open-Meteo/GDACS sources</label>
-<button>Analyze evidence</button></form><pre id="result" aria-live="polite"></pre></main>
-<script>
-document.querySelector("#form").addEventListener("submit", async (event) => { event.preventDefault(); const result=document.querySelector("#result"); result.textContent="Analyzing…";
-const body=new FormData(); body.append("text",document.querySelector("#text").value); body.append("claimed_event",document.querySelector("#event").value);
-body.append("claimed_location",document.querySelector("#location").value); body.append("source_url",document.querySelector("#url").value);
-body.append("check_external_sources",document.querySelector("#external").checked); const media=document.querySelector("#media").files[0]; if(media) body.append("media",media);
-try { const response=await fetch("/api/v1/verify",{method:"POST",body}); result.textContent=JSON.stringify(await response.json(),null,2); }
-catch(error) { result.textContent=JSON.stringify({error:error.message},null,2); }});
-</script></body></html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e9f4f2">
+  <title>EventProof — Evidence, not instinct</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="orb orb-one"></div>
+  <div class="orb orb-two"></div>
+  <header class="site-header shell">
+    <a class="brand" href="/" aria-label="EventProof home">
+      <span class="brand-mark"><span></span><span></span><span></span></span>
+      <span>EVENT<span>PROOF</span></span>
+    </a>
+    <div class="header-meta"><span class="status-dot"></span><span>FORENSIC TRIAGE / 01</span><span class="header-rule"></span><span>LOCAL-FIRST</span></div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="eyebrow-line"></span>THE MEDIA EVIDENCE DESK</p>
+        <h1>Evidence,<br><em>not instinct.</em></h1>
+        <p class="hero-lede">A calmer way to interrogate crisis-event media. Upload a fragment, add the claim, and see what the evidence can — and cannot — support.</p>
+        <div class="hero-notes">
+          <span><b>01</b> Inspect</span><span><b>02</b> Ground</span><span><b>03</b> Abstain</span>
+        </div>
+      </div>
+      <div class="hero-graphic" aria-hidden="true">
+        <div class="graphic-label label-top">SIGNAL / 00.78</div>
+        <div class="graphic-label label-bottom">NOISE FLOOR / LOW</div>
+        <svg viewBox="0 0 420 420" role="presentation">
+          <defs>
+            <linearGradient id="ring" x1="0" x2="1"><stop offset="0" stop-color="#f6c15d"/><stop offset="1" stop-color="#c8624e"/></linearGradient>
+            <radialGradient id="core"><stop offset="0" stop-color="#f8d77e" stop-opacity=".85"/><stop offset=".55" stop-color="#e7a65a" stop-opacity=".16"/><stop offset="1" stop-color="#e7a65a" stop-opacity="0"/></radialGradient>
+          </defs>
+          <circle class="scan-core" cx="210" cy="210" r="118" fill="url(#core)"/>
+          <circle class="ring ring-a" cx="210" cy="210" r="150"/>
+          <circle class="ring ring-b" cx="210" cy="210" r="105"/>
+          <circle class="ring ring-c" cx="210" cy="210" r="64"/>
+          <path class="scan-line" d="M210 210 L350 120"/>
+          <path class="scan-line faint" d="M210 210 L82 290"/>
+          <path class="crosshair" d="M210 42v34M210 344v34M42 210h34M344 210h34"/>
+          <circle class="core-dot" cx="210" cy="210" r="8"/>
+          <text x="210" y="199" text-anchor="middle" class="svg-kicker">LIVE SIGNAL</text>
+          <text x="210" y="224" text-anchor="middle" class="svg-value">EVIDENCE</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="workspace-grid">
+      <div class="panel intake-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">01 / INTAKE</p><h2>Bring the fragment.</h2></div>
+          <span class="panel-index">A</span>
+        </div>
+        <form id="form" enctype="multipart/form-data">
+          <label class="dropzone" id="dropzone" for="media">
+            <input id="media" type="file" accept="image/*,video/*,audio/*">
+            <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></span>
+            <span class="drop-title">Drop image, video, or audio</span>
+            <span class="drop-subtitle">or <u>browse your files</u> · max 25 MB</span>
+            <span class="file-name" id="file-name"></span>
+          </label>
+          <div class="field-group">
+            <label class="field"><span>What is being claimed?</span><textarea id="text" rows="4" placeholder="Paste a caption, transcript, or the claim you need to pressure-test…"></textarea></label>
+            <div class="two-col">
+              <label class="field"><span>Event label</span><input id="event" placeholder="e.g. Flood in Quito"></label>
+              <label class="field"><span>Location</span><input id="location" placeholder="City, region, country"></label>
+            </div>
+            <label class="field"><span>Source URL <small>OPTIONAL</small></span><input id="url" type="url" placeholder="https://…"></label>
+          </div>
+          <div class="form-footer">
+            <label class="toggle"><input id="external" type="checkbox"><span class="toggle-ui"></span><span>Ground against live sources <small>OPEN-METEO + GDACS</small></span></label>
+            <button type="submit" class="primary-button"><span>Run evidence pass</span><svg viewBox="0 0 24 24"><path d="M5 12h13m-5-5 5 5-5 5"/></svg></button>
+          </div>
+        </form>
+      </div>
+
+      <aside class="principles">
+        <div class="principles-top"><span class="eyebrow">FIELD NOTES</span><span class="live-pill"><i></i> READY</span></div>
+        <div class="principle-list">
+          <div class="principle"><span>01</span><div><h3>Signals, not verdicts.</h3><p>Every result is a structured read of available evidence — never a claim of universal truth.</p></div></div>
+          <div class="principle"><span>02</span><div><h3>Abstention is a feature.</h3><p>When the trail is thin, EventProof says so. Unverifiable is a useful outcome.</p></div></div>
+          <div class="principle"><span>03</span><div><h3>Human review stays in frame.</h3><p>Surface the uncertainty, segments, and provenance gaps a reviewer should inspect next.</p></div></div>
+        </div>
+        <div class="principles-footer"><span>BUILT FOR CRISIS MEDIA</span><span class="arrow-mark">↗</span></div>
+      </aside>
+    </section>
+
+    <section class="result-section hidden" id="result-section">
+      <div class="result-header">
+        <div><p class="eyebrow">02 / EVIDENCE PASS</p><h2 id="result-title">Report ready.</h2></div>
+        <button class="text-button" id="reset" type="button">Start another pass <span>↗</span></button>
+      </div>
+      <div class="report-hero">
+        <div class="verdict-block"><span class="verdict-kicker">CURRENT READ</span><div id="category" class="verdict">UNVERIFIABLE</div><p id="confidence" class="confidence">No confidence score claimed</p></div>
+        <div class="verdict-meter"><div class="meter-ring" id="meter-ring"><span id="meter-value">—</span></div><div><span class="meter-label">EVIDENCE<br>STRENGTH</span><span class="meter-caption" id="meter-caption">Awaiting signal</span></div></div>
+      </div>
+      <div id="rationale" class="rationale"></div>
+      <div class="report-grid">
+        <article class="report-card"><div class="card-title"><span>EVENT GROUNDING</span><b>01</b></div><div id="grounding" class="card-content"></div></article>
+        <article class="report-card"><div class="card-title"><span>PERTURBATION PROFILE</span><b>02</b></div><div id="perturbation" class="card-content"></div></article>
+        <article class="report-card"><div class="card-title"><span>PROVENANCE / MEDIA</span><b>03</b></div><div id="provenance" class="card-content"></div></article>
+        <article class="report-card"><div class="card-title"><span>EXTERNAL EVIDENCE</span><b>04</b></div><div id="external-report" class="card-content"></div></article>
+      </div>
+      <div class="limitations"><span class="eyebrow">REVIEWER NOTE</span><p id="limitations"></p></div>
+    </section>
+  </main>
+  <footer class="site-footer shell"><span>EVENTPROOF / EVIDENCE DESK</span><span>AN HONEST MVP FOR A MESSY WORLD</span></footer>
+  <script>
+    const form = document.querySelector("#form");
+    const resultSection = document.querySelector("#result-section");
+    const dropzone = document.querySelector("#dropzone");
+    const media = document.querySelector("#media");
+    const fileName = document.querySelector("#file-name");
+    const submitButton = form.querySelector("button");
+    const categoryLabels = { SUPPORTED: "Supported", MANIPULATED: "Manipulated", RECYCLED_OR_MISCONTEXTUALIZED: "Recycled / miscontextualized", CONFLICTING_EVIDENCE: "Conflicting evidence", UNVERIFIABLE: "Unverifiable" };
+
+    media.addEventListener("change", () => { fileName.textContent = media.files[0] ? media.files[0].name : ""; dropzone.classList.toggle("has-file", Boolean(media.files[0])); });
+    ["dragenter", "dragover"].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.add("is-dragging"); }));
+    ["dragleave", "drop"].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.remove("is-dragging"); }));
+    dropzone.addEventListener("drop", event => { if (event.dataTransfer.files[0]) { media.files = event.dataTransfer.files; media.dispatchEvent(new Event("change")); } });
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      submitButton.classList.add("is-loading"); submitButton.querySelector("span").textContent = "Reading signal…";
+      const body = new FormData();
+      body.append("text", document.querySelector("#text").value);
+      body.append("claimed_event", document.querySelector("#event").value);
+      body.append("claimed_location", document.querySelector("#location").value);
+      body.append("source_url", document.querySelector("#url").value);
+      body.append("check_external_sources", document.querySelector("#external").checked);
+      if (media.files[0]) body.append("media", media.files[0]);
+      try {
+        const response = await fetch("/api/v1/verify", { method: "POST", body });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "The evidence pass could not be completed.");
+        renderReport(payload.report);
+      } catch (error) { renderError(error.message); }
+      finally { submitButton.classList.remove("is-loading"); submitButton.querySelector("span").textContent = "Run evidence pass"; }
+    });
+
+    document.querySelector("#reset").addEventListener("click", () => { resultSection.classList.add("hidden"); form.scrollIntoView({ behavior: "smooth", block: "start" }); });
+
+    function renderReport(report) {
+      resultSection.classList.remove("hidden");
+      document.querySelector("#category").textContent = categoryLabels[report.category] || report.category;
+      document.querySelector("#confidence").textContent = report.confidence === null ? "No confidence score claimed" : `${Math.round(report.confidence * 100)}% calibrated signal`;
+      const score = report.perturbation_profile.score;
+      const meter = score === null ? null : Math.round(score * 100);
+      document.querySelector("#meter-value").textContent = meter === null ? "—" : `${meter}%`;
+      document.querySelector("#meter-caption").textContent = meter === null ? "No perturbation profile" : report.perturbation_profile.interpretation;
+      document.querySelector("#meter-ring").style.setProperty("--meter", `${meter || 0}%`);
+      document.querySelector("#rationale").innerHTML = (report.rationale || []).map(item => `<span><i>+</i>${escapeHtml(item)}</span>`).join("");
+      document.querySelector("#grounding").innerHTML = definitionList({ "Event": report.event_grounding.event || "Not extracted", "Locations": listValue(report.event_grounding.locations), "Dates": listValue(report.event_grounding.dates), "Coordinates": listValue(report.event_grounding.coordinates) });
+      document.querySelector("#perturbation").innerHTML = definitionList({ "Status": report.perturbation_profile.available ? "Profile available" : "Not provided", "Mean score": score === null ? "—" : `${Math.round(score * 100)}%`, "Signals": listValue(report.perturbation_profile.signals), "Samples": report.perturbation_profile.sample_count || "—" });
+      document.querySelector("#provenance").innerHTML = definitionList({ "Media": report.media_inspection.provided ? `${report.media_inspection.content_type || "file"} · ${formatBytes(report.media_inspection.size_bytes)}` : "Not provided", "Hash": report.media_inspection.sha256 ? report.media_inspection.sha256.slice(0, 16) + "…" : "—", "Metadata": report.metadata_inspection.provided ? `${report.metadata_inspection.keys.length} keys inspected` : "Not provided", "Source": report.provenance.source_url || "No URL supplied" });
+      document.querySelector("#external-report").innerHTML = definitionList({ "Status": report.external_evidence.status.replaceAll("_", " "), "Sources": report.external_evidence.sources.length ? report.external_evidence.sources.map(source => source.provider).join(" · ") : "None requested", "Grounding": report.external_evidence.note || "Offline pass", "Review": "Human verification required" });
+      document.querySelector("#limitations").textContent = (report.limitations || []).join(" ");
+      resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderError(message) { resultSection.classList.remove("hidden"); document.querySelector("#category").textContent = "Pass interrupted"; document.querySelector("#confidence").textContent = message; document.querySelector("#rationale").innerHTML = "<span><i>!</i>Check the file type, request fields, and server status, then try again.</span>"; resultSection.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    function definitionList(data) { return Object.entries(data).map(([key, value]) => `<div class="definition"><span>${escapeHtml(key)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join(""); }
+    function listValue(value) { return Array.isArray(value) && value.length ? value.join(" · ") : "Not extracted"; }
+    function formatBytes(bytes) { if (!bytes) return "0 B"; if (bytes < 1024) return `${bytes} B`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
+    function escapeHtml(value) { return value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
+  </script>
+</body>
+</html>
